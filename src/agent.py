@@ -5,11 +5,11 @@ from langchain.schema import SystemMessage
 from tools.playlist_manipulation import create_playlist,delete_playlist,toggle_playlist_privacy
 from tools.get_songs import get_recommendations,recommendation_desc,get_spotify_song_id
 from tools.modify_songs_in_playlist import add_songs_to_playlist,delete_songs_from_playlist
-from langchain_community.utilities import SerpAPIWrapper
+# from langchain_community.utilities import SerpAPIWrapper
 
 load_dotenv()
 api_key = os.environ.get("GOOGLE_API_KEY")
-search = SerpAPIWrapper()
+# search = SerpAPIWrapper()
 
 def run_spotify_agent(llm):
     

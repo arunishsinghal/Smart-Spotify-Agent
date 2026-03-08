@@ -36,13 +36,15 @@ def get_auth_code():
             params = urllib.parse.parse_qs(query)
             if "code" in params:
                 CallbackHandler.auth_code = params["code"][0]
-                #print("Authorization code:", CallbackHandler.auth_code)
                 self.send_response(200)
-                #self.end_headers()
+                self.send_header("Content-Type", "text/plain; charset=utf-8")
+                self.end_headers()
                 self.wfile.write(b"You can close this window now.")
             else:
                 self.send_response(400)
+                self.send_header("Content-Type", "text/plain; charset=utf-8")
                 self.end_headers()
+                self.wfile.write(b"Missing authorization code.")
 
     server = HTTPServer(("127.0.0.1", 8888), CallbackHandler)
     print("Waiting for Spotify redirect...")
@@ -57,7 +59,7 @@ def get_auth_code():
 
     if CallbackHandler.auth_code is None:
         print("Authorization failed or was canceled.")
-
+    print(CallbackHandler.auth_code)
     return CallbackHandler.auth_code
 
 def get_tokens(auth_code):
@@ -70,20 +72,29 @@ def get_tokens(auth_code):
     Returns:
         dict: A dictionary containing access_token, refresh_token, and other token info.
     """
+    # validate credentials
+    if not client_id or not client_secret:
+        raise EnvironmentError("client_id or client_secret not set in environment (.env)")
+
+    cid = client_id.strip()
+    csecret = client_secret.strip()
+
     url = "https://accounts.spotify.com/api/token"
+    auth_header = base64.b64encode(f"{cid}:{csecret}".encode()).decode()
     headers = {
-        "Authorization": "Basic " + base64.b64encode(
-            f"{client_id}:{client_secret}".encode()
-        ).decode()
+        "Authorization": f"Basic {auth_header}",
+        "Content-Type": "application/x-www-form-urlencoded"
     }
     data = {
         "grant_type": "authorization_code",
         "code": auth_code,
-        "redirect_uri": redirect_uri,
+        "redirect_uri": redirect_uri
     }
 
-    r = requests.post(url, headers=headers, data=data)
-    r.raise_for_status()
+    r = requests.post(url, headers=headers, data=data, timeout=10)
+    if r.status_code != 200:
+        # surface body for debugging (invalid_client, invalid_grant, redirect_uri_mismatch, etc.)
+        raise RuntimeError(f"Token request failed ({r.status_code}): {r.text}")
     return r.json()
 
 def refresh_access_token(refresh_token):
@@ -127,8 +138,6 @@ def main_auth():
         auth_code = get_auth_code()
         if auth_code:
             tokens = get_tokens(auth_code)
-            #print("Access token:", tokens.get("access_token"))
-            #print("Refresh token:", tokens.get("refresh_token")) #Uncomment it for debugging.
             access_token = tokens.get("access_token")
             refresh_token= tokens.get("refresh_token")
             if refresh_token:
